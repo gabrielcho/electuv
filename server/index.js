@@ -48,9 +48,11 @@ app.get('/', (req, res) => res.send('ElectUV'));
 
 //cursos route
 //sends all the courses available in a JSON list
-app.get('/cursos', (req, res) => {
+app.get('/cursos', async (req, res) => {
    //should set the response as a JSON list
-
+    let courses = await models.Course.findAll();
+    console.log(courses)
+    res.send(courses);
 });
 
 
