@@ -23,7 +23,8 @@ app.use(express.urlencoded());
 */
 
 async function createCourse(jsoncourse){
-    let courseid
+
+    let courseId = 'invalid';
     await models.Course.create({
         coursecode: jsoncourse.coursecode,
         coursename: jsoncourse.coursename,
@@ -31,17 +32,45 @@ async function createCourse(jsoncourse){
         rating: jsoncourse.rating,
         faculty: jsoncourse.faculty
     })
-    .then((id) => courseid = id)
+    .then((id) => courseId = id)
     .catch((err) => console.log(err));
 
-    return courseid;
+    return courseId;
+}
+
+/* 
+{
+    ### This is how it would look a JSON sent from the Client Side
+
+    title: 'tremenda materia, me encantó',
+    teacher: "Fuam fuam",
+    period: '2021-1,
+    content: 'El único profesor que se ha esforzado en enseñarme algo'
+
+    The request agent has to be authenticated before any operation could occur
+};
+*/
+async function postReview(jsonreview){
+    let reviewId = 'invalid';
+    await models.Review.create({
+        userid: jsonreview.userid,
+        courseid:jsonreview.courseid,
+        title: jsonreview.title,
+        teacher: jsonreview.teacher,
+        period: jsonreview.period,
+        content: jsonreview.content
+    })
+    .then((id) => reviewId = id)
+    .catch((err) => console.error(err) );
+
+    return reviewId;
 }
 
 
 //postcourse route
 app.post('/postcourse', (req, res) => {
-    let courseid = createCourse(req.body);
-    res.send(courseid);
+    let courseId =  createCourse(req.body);
+    res.send(courseId);
 })
 
 app.get('/', (req, res) => res.send('ElectUV'));
@@ -51,7 +80,6 @@ app.get('/', (req, res) => res.send('ElectUV'));
 app.get('/cursos', async (req, res) => {
    //should set the response as a JSON list
     let courses = await models.Course.findAll();
-    console.log(courses)
     res.send(courses);
 });
 
@@ -61,9 +89,11 @@ app.get('/reviews/:id', (req, res) => {
     //should return the reviews of the corresponding course 
 });
 
-//publicar Review route
-//Should include authenticate middleware,
-app.post('/publicar', (req, res) => {
+//publicarreview Review route
+//Should include authenticate middleware (NOT YET)
+app.post('/publicarreview', async (req, res) => {
+    let idReview = await postReview({...req.body, userid:1} ); //En esta linea userid debe ser en realidad req.user.id
+    res.send(idReview);                                        //- así que esto es por testing
 
 });
 
