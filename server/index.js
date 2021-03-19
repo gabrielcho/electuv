@@ -66,10 +66,19 @@ async function postReview(jsonreview){
     return reviewId;
 }
 
+// .destroy to delete rows
+async function deleteReview(reviewId){
+    let rowsdeleted = 0;
+    await models.Review.destroy({where: {id:reviewId}})
+    .then((result) =>  rowsdeleted = result)
+    .catch((err) => console.error(err));
+    return rowsdeleted;
+}
+
 
 //postcourse route
-app.post('/postcourse', (req, res) => {
-    let courseId =  createCourse(req.body);
+app.post('/postcourse', async(req, res) => {
+    let courseId =  await createCourse(req.body);
     res.send(courseId);
 })
 
@@ -90,10 +99,11 @@ app.get('/reviews/:id', (req, res) => {
 });
 
 //publicarreview Review route
-//Should include authenticate middleware (NOT YET)
+// + Should include authenticate middleware (NOT YET)
+// + Should not post the review if the user has already posted one
 app.post('/publicarreview', async (req, res) => {
-    let idReview = await postReview({...req.body, userid:1} ); //En esta linea userid debe ser en realidad req.user.id
-    res.send(idReview);                                        //- así que esto es por testing
+    let reviewId = await postReview({...req.body, userid:1} ); //En esta linea userid debe ser en realidad req.user.id
+    res.send(re);                                        //- así que esto es por testing
 
 });
 
@@ -102,7 +112,17 @@ should include authentication middleware
 It deletes a review from the database
 If the review ID is not from the authenticated use
 */
-app.delete('/eliminarreview/:id', (req,res) => {
+app.delete('/eliminarreview/:id', async(req,res) => {
+    let reviewId = req.params.id;
+
+    //First it has to check if the review was created by the user
+    //If not, the code from below will not be executed
+    await deleteReview(reviewId)
+    .then( (rowsDeleted) => {
+        rowsDeleted > 0 ? 
+        res.status(200).send('Se eliminó la review de la base de datos') 
+        : res.status(406).send('La review que intentas eliminar ya no existe')
+    });
 
 });
 
