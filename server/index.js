@@ -67,7 +67,7 @@ async function postReview(jsonreview){
 }
 
 // .destroy to delete rows
-async function deleteReview(reviewId){
+async function deleteReview(reviewId) {
     let rowsdeleted = 0;
     await models.Review.destroy({where: {id:reviewId}})
     .then((result) =>  rowsdeleted = result)
@@ -75,8 +75,16 @@ async function deleteReview(reviewId){
     return rowsdeleted;
 }
 
+async function getReview(courseId) {
+    let reviews = [];
+    await models.Review.findAll({where: {courseid:courseId}})
+    .then((reviewList) => reviews = reviewList)
+    .catch((err) => console.error(err));
+    return reviews;
+}
 
-//postcourse route
+
+//postcourse route //dev only
 app.post('/postcourse', async(req, res) => {
     let courseId =  await createCourse(req.body);
     res.send(courseId);
@@ -93,9 +101,29 @@ app.get('/cursos', async (req, res) => {
 });
 
 
-//Reviews route
-app.get('/reviews/:id', (req, res) => {
-    //should return the reviews of the corresponding course 
+
+/*
+Reviews route.
++ Should return the reviews list of the corresponding course 
++ Should inform by response if there is no course with the corresponding courseid
+*/
+app.get('/reviews/:courseid', async(req, res) => {
+    let courseId = req.params.courseid;
+    let reviews = null;
+
+     if(await models.Course.findByPk(courseId)){
+        await getReview(courseId)
+        .then((reviewList) => reviews =  reviewList)
+        .catch((err) => console.log(err));
+     }
+    
+    if(reviews){
+        res.status(200).send(reviews);
+    }
+    else{
+        res.status(400).send('El curso al que intentas acceder no existe.')
+    }
+
 });
 
 //publicarreview Review route
@@ -103,7 +131,7 @@ app.get('/reviews/:id', (req, res) => {
 // + Should not post the review if the user has already posted one
 app.post('/publicarreview', async (req, res) => {
     let reviewId = await postReview({...req.body, userid:1} ); //En esta linea userid debe ser en realidad req.user.id
-    res.send(re);                                        //- así que esto es por testing
+    res.send(reviewId);                                        //- así que esto es por testing
 
 });
 
