@@ -96,24 +96,38 @@ app.get('/', (req, res) => res.send('ElectUV'));
 //sends all the courses available in a JSON list
 app.get('/cursos', async (req, res) => {
    //should set the response as a JSON list
-    let courses = await models.Course.findAll();
-    res.send(courses);
+    await models.Course.findAll()
+        .then((courses) => res.status(200).send(courses))
+        .catch((err) => res.status(400).send('error de comunicación con la base de datos'));
 });
 
 
 
 /*
 Reviews route.
-+ Should return the reviews list of the corresponding course 
-+ Should inform by response if there is no course with the corresponding courseid
++ (DONE) Should return the reviews list of the corresponding course 
++ (DONE) Should inform by response if there is no course with the corresponding courseid
 */
 app.get('/reviews/:courseid', async(req, res) => {
+    //let userId = req.user.id;
     let courseId = req.params.courseid;
     let reviews = null;
 
      if(await models.Course.findByPk(courseId)){
         await getReview(courseId)
-        .then((reviewList) => reviews =  reviewList)
+        .then((reviewList) => reviews =  reviewList.foreach((review) => {
+            //if we find a vote that has the user ID and the current review ID we will place its value
+            let userVote = models.Vote.findOne({ //Here we have to fetch the database to know if the user has voted on any of the reviews
+                where: {userid: userId, reviewid: review.id}
+            });
+            if(userVote){
+                return {...review, vote: userVote }
+            }
+            else{
+                return {...review, vote: 0}
+            }
+            
+        } ))
         .catch((err) => console.log(err));
      }
     
@@ -153,6 +167,10 @@ app.delete('/eliminarreview/:id', async(req,res) => {
     });
 
 });
+
+/* votarreview route
+    it checks if the user has already voted 
+*/
 
 /*     Auth routes
 These routes are used to authenticate the user and let him use protected routes
