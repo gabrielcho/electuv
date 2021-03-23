@@ -4,9 +4,32 @@ const PORT = process.env.PORT || 5000;
 const dotenv = require('dotenv');
 const models = require('./models');
 const Op = models.Sequelize.Op;
+const passport = require('passport');
+const cookieSession = require('cookie-session');
+var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 
 
+passport.use(new GoogleStrategy({
+    clientID: GOOGLE_CLIENT_ID,
+    clientSecret: GOOGLE_CLIENT_SECRET,
+    callbackURL: "http://localhost:5000/auth/google/callback"
+  },
+  function(accessToken, refreshToken, profile, done) {
+       User.findOrCreate({ googleid: profile.id, name:profile.givenName, admin: false}, function (err, user) {
+         return done(err, user);
+       });
+  }
+));
 
+
+//passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
+//cookie-session middleware
+app.use()
+
+//request body parsing
 app.use(express.json());
 app.use(express.urlencoded());
 
@@ -75,7 +98,7 @@ async function deleteReview(reviewId) {
     return rowsdeleted;
 }
 
-async function getReview(courseId) {
+async function getReviews(courseId) {
     let reviews = [];
     await models.Review.findAll({where: {courseid:courseId}})
     .then((reviewList) => reviews = reviewList)
@@ -113,9 +136,8 @@ app.get('/reviews/:courseid', async(req, res) => {
     let courseId = req.params.courseid;
     let reviews = null;
 
-     if(await models.Course.findByPk(courseId)){
-        await getReview(courseId)
-        .then((reviewList) => reviews =  reviewList.foreach((review) => {
+     if (await models.Course.findByPk(courseId)){
+        await getReviews(courseId).then((reviewList) => reviews =  reviewList.foreach((review) => {
             //if we find a vote that has the user ID and the current review ID we will place its value
             let userVote = models.Vote.findOne({ //Here we have to fetch the database to know if the user has voted on any of the reviews
                 where: {userid: userId, reviewid: review.id}
