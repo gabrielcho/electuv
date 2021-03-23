@@ -1,11 +1,14 @@
 const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 5000;
-const dotenv = require('dotenv');
+const dotenv = require('dotenv').config();
 const models = require('./models');
 const Op = models.Sequelize.Op;
-const passport = require('passport');
+
 const cookieSession = require('cookie-session');
+
+
+const passport = require('passport');
 var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 
 
@@ -15,11 +18,14 @@ passport.use(new GoogleStrategy({
     callbackURL: "http://localhost:5000/auth/google/callback"
   },
   function(accessToken, refreshToken, profile, done) {
-       User.findOrCreate({ googleid: profile.id, name:profile.givenName, admin: false}, function (err, user) {
+       models.User.findOrCreate({
+         googleid: profile.id, name: profile.givenName, admin: false},
+         function (err, user) {
          return done(err, user);
        });
   }
 ));
+
 
 
 //passport middleware
@@ -27,7 +33,10 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 //cookie-session middleware
-app.use()
+app.use(cookieSession({
+    name:'electuv-session',
+    keys: [KEY1, KEY2]
+}));
 
 //request body parsing
 app.use(express.json());
@@ -106,14 +115,33 @@ async function getReviews(courseId) {
     return reviews;
 }
 
+passport.serializeUser((user, done) => {
+    
+    done(null, user.id);
+})
+
+passport.deserializeUser(() => {});
+
+
+
+//passport authentication routes
+app.get('/auth/google', passport.authenticate('google', {scope: 'profile'}), (req, res) => {
+    
+});
+
+app.get('/auth/google/auth/', passport.authenticate('google', { failureRedirect: '/authfallido' }), (req, res) => {
+    res.redirect('/');
+});
+
+//root route ('homepage')
+app.get('/', (req, res) => res.send('ElectUV'));
+
 
 //postcourse route //dev only
 app.post('/postcourse', async(req, res) => {
     let courseId =  await createCourse(req.body);
     res.send(courseId);
 })
-
-app.get('/', (req, res) => res.send('ElectUV'));
 
 //cursos route
 //sends all the courses available in a JSON list
