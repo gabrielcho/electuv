@@ -9,23 +9,29 @@ const cookieSession = require('cookie-session');
 
 
 const passport = require('passport');
-var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
+var GoogleStrategy = require('passport-google-oauth20');
 
 
 passport.use(new GoogleStrategy({
-    clientID: GOOGLE_CLIENT_ID,
-    clientSecret: GOOGLE_CLIENT_SECRET,
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: "http://localhost:5000/auth/google/callback"
   },
-  function(accessToken, refreshToken, profile, done) {
-       models.User.findOrCreate({
-         googleid: profile.id, name: profile.givenName, admin: false},
-         function (err, user) {
-         return done(err, user);
-       });
+  async function(accessToken, refreshToken, profile, done) {
+    let [user, created] = await models.User.findOrCreate({where: {googleid: profile.id}, defaults:{name: profile.name.givenName , admin:false}});
+    console.log(profile);
+    done(null, user);
   }
 ));
 
+/*{
+        where: {
+                googleid: profile.id
+            }}, {
+        default: {
+                name: profile.givenName, admin: false}
+    }
+*/
 
 
 //passport middleware
@@ -35,7 +41,7 @@ app.use(passport.session());
 //cookie-session middleware
 app.use(cookieSession({
     name:'electuv-session',
-    keys: [KEY1, KEY2]
+    keys: [process.env.KEY1, process.env.KEY2]
 }));
 
 //request body parsing
@@ -115,12 +121,17 @@ async function getReviews(courseId) {
     return reviews;
 }
 
+// Passport serialize and deserializeuser functions
+
 passport.serializeUser((user, done) => {
     
     done(null, user.id);
 })
 
-passport.deserializeUser(() => {});
+passport.deserializeUser(async (id, done) => {
+    let user = await models.User.findByPk(id);
+    done(null, user);
+});
 
 
 
@@ -129,7 +140,7 @@ app.get('/auth/google', passport.authenticate('google', {scope: 'profile'}), (re
     
 });
 
-app.get('/auth/google/auth/', passport.authenticate('google', { failureRedirect: '/authfallido' }), (req, res) => {
+app.get('/auth/google/callback/', passport.authenticate('google', { failureRedirect: '/authfallido' }), (req, res) => {
     res.redirect('/');
 });
 
