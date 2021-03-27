@@ -54,7 +54,6 @@ app.use(express.urlencoded());
 
 // Middleware used to check if the user has the correct auth cookies.
 function checkAuth(req,res,next){
-    console.log(req.user);
     if(req.isAuthenticated()){
     
         //req.isAuthenticated() will return true if user is logged in
@@ -62,7 +61,7 @@ function checkAuth(req,res,next){
         next();
     } else{
         console.log(req.isAuthenticated());
-        res.redirect("/");
+        res.redirect("/auth/google");
     }
 }
 
@@ -145,7 +144,7 @@ passport.serializeUser((user, done) => {
 })
 
 passport.deserializeUser(async (id, done) => {
-    console.log('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA DESERIALIZ');
+    console.log('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA DESERIALIZE');
 
     let user = await models.User.findByPk(id);
     done(null, user);
@@ -189,7 +188,7 @@ Reviews route.
 + (DONE) Should inform by response if there is no course with the corresponding courseid
 */
 app.get('/reviews/:courseid', async(req, res) => {
-    //let userId = req.user.id;
+    
     let courseId = req.params.courseid;
     let reviews = null;
 
@@ -220,11 +219,30 @@ app.get('/reviews/:courseid', async(req, res) => {
 });
 
 //publicarreview Review route
+// THIS ENDPOINT NOW WORKS CORRECTLY
 // + (DONE) Should include authenticate middleware
-// + Should not post the review if the user has already posted one
+// + (DONE) Should not post the review if the user has already posted one
+
 app.post('/publicarreview', checkAuth, async (req, res) => {
-    let reviewId = await postReview({...req.body, userid:1} ); //En esta linea userid debe ser en realidad req.user.id
-    res.send(reviewId);                                        //- así que esto es por testing
+    let userPk = req.user.id;
+    let reviewId = null;
+    if(await models.Review.findOne({ //find one row where the user id is the same as the req.user.id
+        where: {userid: userPk.toString()}
+    })) { 
+        reviewId = await postReview({...req.body, userid: userPk.toString()} ); 
+
+        res.status(200).send(reviewId);                                        
+    }
+
+    res.status(400).send('Ya hiciste una review sobre este curso! Sólo una review por curso.'); 
+    
+    if(!reviewId){ // if the review id is null it means that the course does not exist
+        res.status(400).send('Este curso no existe.');
+    }
+        
+    
+    
+    
 
 });
 
