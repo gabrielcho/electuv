@@ -34,9 +34,6 @@ passport.use(new GoogleStrategy({
 */
 
 
-//passport middleware
-app.use(passport.initialize());
-app.use(passport.session());
 
 //cookie-session middleware
 app.use(cookieSession({
@@ -44,11 +41,30 @@ app.use(cookieSession({
     keys: [process.env.KEY1, process.env.KEY2]
 }));
 
+//passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
+
+
 //request body parsing
 app.use(express.json());
 app.use(express.urlencoded());
 
 
+// Middleware used to check if the user has the correct auth cookies.
+function checkAuth(req,res,next){
+    console.log(req.user);
+    if(req.isAuthenticated()){
+    
+        //req.isAuthenticated() will return true if user is logged in
+        console.log(req.isAuthenticated());
+        next();
+    } else{
+        console.log(req.isAuthenticated());
+        res.redirect("/");
+    }
+}
 
 /* example json
 {
@@ -124,11 +140,13 @@ async function getReviews(courseId) {
 // Passport serialize and deserializeuser functions
 
 passport.serializeUser((user, done) => {
-    
+    console.log('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SERIALIZE ');
     done(null, user.id);
 })
 
 passport.deserializeUser(async (id, done) => {
+    console.log('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA DESERIALIZ');
+
     let user = await models.User.findByPk(id);
     done(null, user);
 });
@@ -145,18 +163,18 @@ app.get('/auth/google/callback/', passport.authenticate('google', { failureRedir
 });
 
 //root route ('homepage')
-app.get('/', (req, res) => res.send('ElectUV'));
+app.get('/', (req, res) => res.send(req.session));
 
 
 //postcourse route //dev only
-app.post('/postcourse', async(req, res) => {
+app.post('/postcourse',checkAuth,  async(req, res) => {
     let courseId =  await createCourse(req.body);
     res.send(courseId);
 })
 
 //cursos route
 //sends all the courses available in a JSON list
-app.get('/cursos', async (req, res) => {
+app.get('/cursos', checkAuth, async (req, res) => {
    //should set the response as a JSON list
     await models.Course.findAll()
         .then((courses) => res.status(200).send(courses))
@@ -202,9 +220,9 @@ app.get('/reviews/:courseid', async(req, res) => {
 });
 
 //publicarreview Review route
-// + Should include authenticate middleware (NOT YET)
+// + (DONE) Should include authenticate middleware
 // + Should not post the review if the user has already posted one
-app.post('/publicarreview', async (req, res) => {
+app.post('/publicarreview', checkAuth, async (req, res) => {
     let reviewId = await postReview({...req.body, userid:1} ); //En esta linea userid debe ser en realidad req.user.id
     res.send(reviewId);                                        //- así que esto es por testing
 
@@ -212,11 +230,13 @@ app.post('/publicarreview', async (req, res) => {
 
 /*   eliminarreview route
 should include authentication middleware
-It deletes a review from the database
-If the review ID is not from the authenticated use
+It deletes a review from the database (DONE)
+If the review ID is not from the authenticated user, do NOT delete it (NOT YET)
 */
-app.delete('/eliminarreview/:id', async(req,res) => {
+app.delete('/eliminarreview/:id', checkAuth, async(req,res) => {
     let reviewId = req.params.id;
+    let userId = req.session;
+
 
     //First it has to check if the review was created by the user
     //If not, the code from below will not be executed
