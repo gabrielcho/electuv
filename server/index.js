@@ -219,7 +219,7 @@ app.get('/reviews/:courseid', async(req, res) => {
 });
 
 //publicarreview Review route
-// THIS ENDPOINT NOW WORKS CORRECTLY
+// THIS ENDPOINT NOW WORKS AS EXPECTED
 // + (DONE) Should include authenticate middleware
 // + (DONE) Should not post the review if the user has already posted one
 
@@ -248,22 +248,30 @@ app.post('/publicarreview', checkAuth, async (req, res) => {
 
 /*   eliminarreview route
 should include authentication middleware
-It deletes a review from the database (DONE)
-If the review ID is not from the authenticated user, do NOT delete it (NOT YET)
++ (DONE) It deletes a review from the database 
++ (DONE) If the review ID is not from the authenticated user, do NOT delete it 
 */
 app.delete('/eliminarreview/:id', checkAuth, async(req,res) => {
     let reviewId = req.params.id;
-    let userId = req.session;
+    let userId = req.user.id;
 
 
     //First it has to check if the review was created by the user
-    //If not, the code from below will not be executed
-    await deleteReview(reviewId)
-    .then( (rowsDeleted) => {
-        rowsDeleted > 0 ? 
-        res.status(200).send('Se eliminó la review de la base de datos') 
-        : res.status(406).send('La review que intentas eliminar ya no existe')
-    });
+    models.Review.findOne({where: {userid: userId.toString, courseId: reviewId}})
+    .then( (foundReview) => { 
+        if(foundReview){ //if it found a review, it will execute the delete operation
+            deleteReview(reviewId)
+            .then( (rowsDeleted) => {
+                rowsDeleted > 0 ? 
+                res.status(200).send('Se eliminó la review de la base de datos') 
+                : res.status(406).send('La review que intentas eliminar ya no existe')
+            });
+        }
+
+        else{
+            res.status(400).send('La review no existe o no es de tu autoría');
+        }
+    } )
 
 });
 
@@ -274,9 +282,9 @@ app.delete('/eliminarreview/:id', checkAuth, async(req,res) => {
 /*     Auth routes
 These routes are used to authenticate the user and let him use protected routes
 */ 
-// app.get('/auth/google');
+// app.get('/auth/google'); (DONE)
 // app.get('/logout');
-// app.get('/auth/google/callback');
+// app.get('/auth/google/callback'); (DONE)
 
 
 
