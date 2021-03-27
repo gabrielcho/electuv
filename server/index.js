@@ -133,6 +133,7 @@ async function getReviews(courseId) {
     await models.Review.findAll({where: {courseid:courseId}})
     .then((reviewList) => reviews = reviewList)
     .catch((err) => console.error(err));
+
     return reviews;
 }
 
@@ -188,30 +189,31 @@ Reviews route.
 + (DONE) Should inform by response if there is no course with the corresponding courseid
 */
 app.get('/reviews/:courseid', async(req, res) => {
-    
-    let courseId = req.params.courseid;
+    let userId = req.user.id;
+    let courseId = req.params.courseid; //route params course id
     let reviews = null;
 
-     if (await models.Course.findByPk(courseId)){
-        await getReviews(courseId).then((reviewList) => reviews =  reviewList.foreach((review) => {
-            //if we find a vote that has the user ID and the current review ID we will place its value
-            let userVote = models.Vote.findOne({ //Here we have to fetch the database to know if the user has voted on any of the reviews
-                where: {userid: userId, reviewid: review.id}
-            });
-            if(userVote){
-                return {...review, vote: userVote }
-            }
-            else{
-                return {...review, vote: 0}
-            }
-            
-        } ))
+     if (await models.Review.findAll({where: {courseid: courseId}})){ // if we find a course with the param id
+
+        await getReviews(courseId).then((reviewList) => reviews = reviewList)
         .catch((err) => console.log(err));
+
+        reviews = await  Promise.all(reviews.map( (review) => { //we check for user votes for every Review
+            //if we find a vote that has the user ID and the current review ID we will place its value
+            let currentVote = 0
+            models.Vote.findOne({ //Here we have to fetch the database to know if the user has voted on any of the reviews
+                where: {userid: userId, reviewid: review.id}
+            }).then((userVote) => {
+                    currentVote = userVote ? userVote.vote : 0;
+            }).catch(err => console.log(err));
+            
+            return {...review.dataValues, vote: currentVote} //returns current review item spreaded along the vote gotten by above function
+        }))
+
+        console.log('REVIEWS', reviews)
+        res.status(200).send(reviews);
      }
     
-    if(reviews){
-        res.status(200).send(reviews);
-    }
     else{
         res.status(400).send('El curso al que intentas acceder no existe.')
     }
