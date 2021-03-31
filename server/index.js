@@ -66,6 +66,7 @@ function checkAuth(req,res,next){
     }
 }
 
+
 /* example json
 {
         coursecode: '710252M',
@@ -78,7 +79,10 @@ function checkAuth(req,res,next){
 
 async function  createCourse(jsoncourse){
 
-    let courseId = 'invalid';
+    let createdCourse = 'invalid';
+    if(await models.Course.findOne({where: {coursecode: jsoncourse.coursecode} })){
+        return -1; //course already exists
+    }
     await models.Course.create({
         coursecode: jsoncourse.coursecode,
         coursename: jsoncourse.coursename,
@@ -88,10 +92,10 @@ async function  createCourse(jsoncourse){
         reviewcount: 0,
         faculty: jsoncourse.faculty
     })
-    .then((id) => courseId = id)
+    .then((course) => createdCourse = course)
     .catch((err) => console.log(err));
 
-    return courseId;
+    return createdCourse;
 }
 
 /* 
@@ -170,9 +174,10 @@ passport.serializeUser((user, done) => {
 })
 
 passport.deserializeUser(async (id, done) => {
-    console.log('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA DESERIALIZE');
 
     let user = await models.User.findByPk(id);
+    console.log('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA DESERIALIZE');
+
     done(null, user);
 });
 
@@ -193,13 +198,31 @@ app.get('/', (req, res) => res.send(req.session));
 
 //postcourse route //dev only
 app.post('/postcourse',checkAuth,  async(req, res) => {
-    let courseId =  await createCourse(req.body);
-    res.send(courseId);
+    await models.User.findByPk(req.user.id)
+    .then(async (user) => {
+        if(user.admin){
+            await createCourse(req.body)
+            .then((course => {
+                if(course == -1){
+                    res.status(400).send('El curso ya existe');
+                }
+                else{
+                    res.status(200).send(course);
+                }
+            }));
+        }
+        else{
+            res.status(400).send('No tienes los permisos requeridos.');
+        }
+        
+
+    });
+
 })
 
 //cursos route
 //sends all the courses available in a JSON list
-app.get('/cursos', checkAuth, async (req, res) => {
+app.get('/cursos', async (req, res) => {
    //should set the response as a JSON list
     await models.Course.findAll()
         .then((courses) => res.status(200).send(courses))
@@ -272,7 +295,7 @@ app.post('/publicarreview', checkAuth, async (req, res) => {
         }         
         
         else {
-            reviewId = await postReview({...req.body, userid: userPk, author: req.user.name, votes: 0} ); 
+            reviewId = await postReview({...req.body, userid: userPk, author: 'Anónimo', votes: 0} ); 
             console.log(reviewId);
             res.status(200).send(reviewId);   
         }
@@ -299,9 +322,8 @@ app.delete('/eliminarreview/:id', checkAuth, async(req,res) => {
     //First it has to check if the review was created by the user
     models.Review.findOne({where: {userid: userId, id: reviewId}})
     .then( (foundReview) => { 
-        console.log(userId.toString(), reviewId);
-        console.log(foundReview);
-        if(foundReview){ //if it finds a review, it will execute the delete operation
+
+        if(foundReview || req.user.admin){ //if it finds a review created by the user or the user is an administrator, it will execute the delete operation
             deleteReview(reviewId)
             .then( (rowsDeleted) => {
                 rowsDeleted > 0 ? 
