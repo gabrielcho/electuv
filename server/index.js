@@ -232,34 +232,33 @@ app.get('/reviews/:courseid', async(req, res) => {
 /* publicarreview Review route
 
  ||||||THIS ENDPOINT IS NOW WORKING AS EXPECTED||||||
+ 
+ (Tested)
 
  + (DONE) Should include authenticate middleware
  + (DONE) Should not post the review if the user has already posted one
 */
 app.post('/publicarreview', checkAuth, async (req, res) => {
-    console.log(req.user.name); 
+    console.log(req.user.name);
     let userPk = req.user.id;
     let reviewId = null;
-    if(await models.Review.findOne({ //find one row where the user id is the same as the req.user.id
-        where: {userid: userPk, courseid: req.body.courseid}
-    })) {
-              
-    res.status(400).send('Ya hiciste una review sobre este curso! Sólo una review por curso.');                       
-    }
-    else{
-        reviewId = await postReview({...req.body, userid: userPk, author: req.user.name, votes: 0} ); 
-        console.log(reviewId);
-        res.status(200).send(reviewId);    
-    }
-
-    if(reviewId == -1){ // if the review id is null it means that the course does not exist
-        res.status(400).send('Este curso no existe.');
-    }
+    if(await models.Course.findByPk(req.body.courseid)) {  //searches if the course does exist
+        if (await models.Review.findOne({ //find one row where the user id is the same as the req.user.id
+            where: {userid: userPk, courseid: req.body.courseid}
+        })){
+            res.status(400).send('Ya hiciste una review sobre este curso! Sólo una review por curso.'); 
+        }         
         
-    
-    
-    
+        else {
+            reviewId = await postReview({...req.body, userid: userPk, author: req.user.name, votes: 0} ); 
+            console.log(reviewId);
+            res.status(200).send(reviewId);   
+        }
+    }
 
+    else{
+        res.status(400).send('Este curso no existe.'); 
+    }
 });
 
 /*   eliminarreview route
