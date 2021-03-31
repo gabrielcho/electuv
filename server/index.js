@@ -116,7 +116,7 @@ async function postReview(jsonreview){
         content: jsonreview.content,
         votes: 0
     })
-    .then((id) => reviewId = id)
+    .then((id) => reviewId = id ? id : -1) // -1 = this course does not exist
     .catch((err) => console.error(err) );
 
     return reviewId;
@@ -241,18 +241,18 @@ app.post('/publicarreview', checkAuth, async (req, res) => {
     let userPk = req.user.id;
     let reviewId = null;
     if(await models.Review.findOne({ //find one row where the user id is the same as the req.user.id
-        where: {userid: userPk}
+        where: {userid: userPk, courseid: req.body.courseid}
     })) {
-        
-        
+              
+    res.status(400).send('Ya hiciste una review sobre este curso! Sólo una review por curso.');                       
+    }
+    else{
         reviewId = await postReview({...req.body, userid: userPk, author: req.user.name, votes: 0} ); 
         console.log(reviewId);
-        res.status(200).send(reviewId);                                        
+        res.status(200).send(reviewId);    
     }
 
-    res.status(400).send('Ya hiciste una review sobre este curso! Sólo una review por curso.'); 
-    
-    if(!reviewId){ // if the review id is null it means that the course does not exist
+    if(reviewId == -1){ // if the review id is null it means that the course does not exist
         res.status(400).send('Este curso no existe.');
     }
         
