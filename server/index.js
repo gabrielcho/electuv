@@ -107,12 +107,14 @@ async function postReview(jsonreview){
     let reviewId = 'invalid';
     await models.Review.create({
         userid: jsonreview.userid,
+        anonymous: jsonreview.anonymous,
         courseid:jsonreview.courseid,
         author: jsonreview.author,
         title: jsonreview.title,
         teacher: jsonreview.teacher,
         period: jsonreview.period,
-        content: jsonreview.content
+        content: jsonreview.content,
+        votes: 0
     })
     .then((id) => reviewId = id)
     .catch((err) => console.error(err) );
@@ -212,7 +214,9 @@ app.get('/reviews/:courseid', async(req, res) => {
                     currentVote = userVote ? userVote.vote : 0;
             }).catch(err => console.log(err));
             
-            return {...review.dataValues, vote: currentVote} //returns current review item spreaded along the vote gotten by above function
+            return {...review.dataValues, 
+                    vote: currentVote, 
+                    author: review.dataValues.anonymous ?  'Anónimo' : review.dataValues.author} //returns current review item spreaded along the vote gotten by above function
         }))
 
         console.log('REVIEWS', reviews)
@@ -241,7 +245,7 @@ app.post('/publicarreview', checkAuth, async (req, res) => {
     })) {
         
         
-        reviewId = await postReview({...req.body, userid: userPk, author: req.user.name} ); 
+        reviewId = await postReview({...req.body, userid: userPk, author: req.user.name, votes: 0} ); 
         console.log(reviewId);
         res.status(200).send(reviewId);                                        
     }

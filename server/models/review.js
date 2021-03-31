@@ -15,12 +15,14 @@ module.exports = (sequelize, DataTypes) => {
   };
   Review.init({
     userid: DataTypes.INTEGER,
+    anonymous: DataTypes.BOOLEAN,
     courseid: DataTypes.STRING,
     author: DataTypes.STRING,
     title: DataTypes.STRING,
     teacher: DataTypes.STRING,
     period: DataTypes.STRING,
-    content: DataTypes.TEXT
+    content: DataTypes.TEXT,
+    votes: DataTypes.INTEGER
   }, {
     sequelize,
     modelName: 'Review',
