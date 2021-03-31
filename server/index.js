@@ -19,7 +19,7 @@ passport.use(new GoogleStrategy({
   },
   async function(accessToken, refreshToken, profile, done) {
     let [user, created] = await models.User.findOrCreate({where: {googleid: profile.id}, defaults:{name: profile.name.givenName , admin:false}});
-    console.log(profile);
+    console.log(user);
     done(null, user);
   }
 ));
@@ -108,6 +108,7 @@ async function postReview(jsonreview){
     await models.Review.create({
         userid: jsonreview.userid,
         courseid:jsonreview.courseid,
+        author: jsonreview.author,
         title: jsonreview.title,
         teacher: jsonreview.teacher,
         period: jsonreview.period,
@@ -232,13 +233,16 @@ app.get('/reviews/:courseid', async(req, res) => {
  + (DONE) Should not post the review if the user has already posted one
 */
 app.post('/publicarreview', checkAuth, async (req, res) => {
+    console.log(req.user.name); 
     let userPk = req.user.id;
     let reviewId = null;
     if(await models.Review.findOne({ //find one row where the user id is the same as the req.user.id
-        where: {userid: userPk.toString()}
-    })) { 
-        reviewId = await postReview({...req.body, userid: userPk.toString()} ); 
-
+        where: {userid: userPk}
+    })) {
+        
+        
+        reviewId = await postReview({...req.body, userid: userPk, author: req.user.name} ); 
+        console.log(reviewId);
         res.status(200).send(reviewId);                                        
     }
 
@@ -255,6 +259,9 @@ app.post('/publicarreview', checkAuth, async (req, res) => {
 });
 
 /*   eliminarreview route
+
+ ||||||THIS ENDPOINT IS NOW WORKING AS EXPECTED||||||
+
 should include authentication middleware
 + (DONE) It deletes a review from the database 
 + (DONE) If the review ID is not from the authenticated user, do NOT delete it 
@@ -265,7 +272,7 @@ app.delete('/eliminarreview/:id', checkAuth, async(req,res) => {
     console.log("USERID: ", userId);
 
     //First it has to check if the review was created by the user
-    models.Review.findOne({where: {userid: userId.toString(), id: reviewId}})
+    models.Review.findOne({where: {userid: userId, id: reviewId}})
     .then( (foundReview) => { 
         console.log(userId.toString(), reviewId);
         console.log(foundReview);
