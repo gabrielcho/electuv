@@ -10,6 +10,8 @@ const cookieSession = require('cookie-session');
 
 const passport = require('passport');
 var GoogleStrategy = require('passport-google-oauth20');
+const { sequelize } = require('./models');
+
 
 
 passport.use(new GoogleStrategy({
@@ -23,7 +25,6 @@ passport.use(new GoogleStrategy({
     done(null, user);
   }
 ));
-
 /*{
         where: {
                 googleid: profile.id
@@ -75,14 +76,16 @@ function checkAuth(req,res,next){
 }
 */
 
-async function createCourse(jsoncourse){
+async function  createCourse(jsoncourse){
 
     let courseId = 'invalid';
     await models.Course.create({
         coursecode: jsoncourse.coursecode,
         coursename: jsoncourse.coursename,
         description: jsoncourse.description,
-        rating: jsoncourse.rating,
+        totalrating: 0,
+        rating: 0,
+        reviewcount: 0,
         faculty: jsoncourse.faculty
     })
     .then((id) => courseId = id)
@@ -101,24 +104,43 @@ async function createCourse(jsoncourse){
     content: 'El único profesor que se ha esforzado en enseñarme algo'
 
     The request agent has to be authenticated before any operation could occur
+
+    //It needs a trycatch block in case it fails to asign the score
 };
 */
 async function postReview(jsonreview){
     let reviewId = 'invalid';
+    if(jsonreview.rating > 5 || jsonreview.rating < 1){
+        return reviewId;
+    }
+    
     await models.Review.create({
         userid: jsonreview.userid,
+        rating: jsonreview.rating,
         anonymous: jsonreview.anonymous,
         courseid:jsonreview.courseid,
         author: jsonreview.author,
-        title: jsonreview.title,
+        title: jsonreview.title, 
         teacher: jsonreview.teacher,
         period: jsonreview.period,
         content: jsonreview.content,
         votes: 0
     })
-    .then((id) => reviewId = id ? id : -1) // -1 = this course does not exist
+    .then((review) => reviewId = review ? review : -1) // -1 = this course does not exist
     .catch((err) => console.error(err) );
-
+    let reviewCount;
+    await models.Course.findOne({where: {id: parseInt(jsonreview.courseid)}}).then((course) =>{
+        reviewCount = course.reviewcount;
+        console.log(reviewcount);
+    }).catch(() => {return -1}); //The number of reviews
+    try{
+        await models.Course.update({rating:  sequelize.literal(`(totalrating + ${jsonreview.rating})/${reviewCount + 1}`),
+            totalrating: sequelize.literal(`totalrating + ${jsonreview.rating}`), reviewcount: sequelize.literal('(reviewcount + 1)') }, {where: {id: jsonreview.courseid}});
+    }
+    catch{
+        return -1;
+    }
+    
     return reviewId;
 }
 
