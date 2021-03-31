@@ -185,6 +185,9 @@ app.get('/cursos', checkAuth, async (req, res) => {
 
 /*
 Reviews route.
+
+||||||THIS ENDPOINT IS NOW WORKING AS EXPECTED||||||
+
 + (DONE) Should return the reviews list of the corresponding course 
 + (DONE) Should inform by response if there is no course with the corresponding courseid
 */
@@ -195,7 +198,8 @@ app.get('/reviews/:courseid', async(req, res) => {
 
      if (await models.Review.findAll({where: {courseid: courseId}})){ // if we find a course with the param id
 
-        await getReviews(courseId).then((reviewList) => reviews = reviewList)
+        await getReviews(courseId)
+        .then((reviewList) => reviews = reviewList)
         .catch((err) => console.log(err));
 
         reviews = await  Promise.all(reviews.map( (review) => { //we check for user votes for every Review
@@ -220,11 +224,13 @@ app.get('/reviews/:courseid', async(req, res) => {
 
 });
 
-//publicarreview Review route
-// THIS ENDPOINT NOW WORKS AS EXPECTED
-// + (DONE) Should include authenticate middleware
-// + (DONE) Should not post the review if the user has already posted one
+/* publicarreview Review route
 
+ ||||||THIS ENDPOINT IS NOW WORKING AS EXPECTED||||||
+
+ + (DONE) Should include authenticate middleware
+ + (DONE) Should not post the review if the user has already posted one
+*/
 app.post('/publicarreview', checkAuth, async (req, res) => {
     let userPk = req.user.id;
     let reviewId = null;
@@ -254,14 +260,16 @@ should include authentication middleware
 + (DONE) If the review ID is not from the authenticated user, do NOT delete it 
 */
 app.delete('/eliminarreview/:id', checkAuth, async(req,res) => {
-    let reviewId = req.params.id;
+    let reviewId = parseInt(req.params.id, 10);
     let userId = req.user.id;
-
+    console.log("USERID: ", userId);
 
     //First it has to check if the review was created by the user
-    models.Review.findOne({where: {userid: userId.toString, courseId: reviewId}})
+    models.Review.findOne({where: {userid: userId.toString(), id: reviewId}})
     .then( (foundReview) => { 
-        if(foundReview){ //if it found a review, it will execute the delete operation
+        console.log(userId.toString(), reviewId);
+        console.log(foundReview);
+        if(foundReview){ //if it finds a review, it will execute the delete operation
             deleteReview(reviewId)
             .then( (rowsDeleted) => {
                 rowsDeleted > 0 ? 
