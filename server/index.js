@@ -25,15 +25,6 @@ passport.use(new GoogleStrategy({
     done(null, user);
   }
 ));
-/*{
-        where: {
-                googleid: profile.id
-            }}, {
-        default: {
-                name: profile.givenName, admin: false}
-    }
-*/
-
 
 
 //cookie-session middleware
@@ -113,7 +104,7 @@ async function  createCourse(jsoncourse){
 };
 */
 async function postReview(jsonreview){
-    let reviewId = 'invalid';
+    let createdReview = 'invalid';
     if(jsonreview.rating > 5 || jsonreview.rating < 1){
         return reviewId;
     }
@@ -130,30 +121,41 @@ async function postReview(jsonreview){
         content: jsonreview.content,
         votes: 0
     })
-    .then((review) => reviewId = review ? review : -1) // -1 = this course does not exist
+    .then((review) => createdReview = review ? review.dataValues : -1) // -1 = this course does not exist
     .catch((err) => console.error(err) );
-    let reviewCount;
+    let reviewCount, totalRating;
     await models.Course.findOne({where: {id: parseInt(jsonreview.courseid)}}).then((course) =>{
         reviewCount = course.reviewcount;
+        totalRating = course.totalrating;
         console.log(reviewcount);
     }).catch(() => {return -1}); //The number of reviews
     try{
-        await models.Course.update({rating:  sequelize.literal(`(totalrating + ${jsonreview.rating})/${reviewCount + 1}`),
+        await models.Course.update({rating:  sequelize.literal(`${(totalRating + jsonreview.rating)/(reviewCount + 1)}`),
             totalrating: sequelize.literal(`totalrating + ${jsonreview.rating}`), reviewcount: sequelize.literal('(reviewcount + 1)') }, {where: {id: jsonreview.courseid}});
     }
     catch{
         return -1;
     }
     
-    return reviewId;
+    return {...createdReview, author: jsonreview.anonymous ? 'Anónimo' : jsonreview.author};
 }
+ 
 
 // .destroy to delete rows
-async function deleteReview(reviewId) {
+/*
+    When we delete a review we must rollback the effects associated with course rating and review count on the respective course row
+*/
+async function deleteReview(review) {
+    console.log(review);
     let rowsdeleted = 0;
-    await models.Review.destroy({where: {id:reviewId}})
+    await models.Review.destroy({where: {id:review.id}})
     .then((result) =>  rowsdeleted = result)
     .catch((err) => console.error(err));
+        let course = await models.Course.findOne({where: {id: review.courseid}});
+
+        await models.Course.update({rating:  sequelize.literal(`(totalrating - ${review.rating}) * ${course.reviewcount - 1 === 0 ? 0 : 1/(course.reviewcount - 1 )}`),
+        totalrating: sequelize.literal(`totalrating - ${review.rating}`), reviewcount: sequelize.literal('(reviewcount - 1)') }, {where: {id: review.courseid}}).then((a) =>{a}).catch((err) => {console.error(err)});
+    
     return rowsdeleted;
 }
 
@@ -183,11 +185,13 @@ passport.deserializeUser(async (id, done) => {
 
 
 
-//passport authentication routes
+//Passport Google Oauth2.0 authentication route
 app.get('/auth/google', passport.authenticate('google', {scope: 'profile'}), (req, res) => {
     
 });
 
+
+// Passport Google Oauth2.0 authentication callback route
 app.get('/auth/google/callback/', passport.authenticate('google', { failureRedirect: '/authfallido' }), (req, res) => {
     res.redirect('/');
 });
@@ -195,8 +199,13 @@ app.get('/auth/google/callback/', passport.authenticate('google', { failureRedir
 //root route ('homepage')
 app.get('/', (req, res) => res.send(req.session));
 
+/*
 
-//postcourse route //dev only
+ ||||||THIS ENDPOINT IS NOW WORKING AS EXPECTED||||||
+
+
+postcourse route //dev only
+*/
 app.post('/postcourse',checkAuth,  async(req, res) => {
     await models.User.findByPk(req.user.id)
     .then(async (user) => {
@@ -214,14 +223,16 @@ app.post('/postcourse',checkAuth,  async(req, res) => {
         else{
             res.status(400).send('No tienes los permisos requeridos.');
         }
-        
-
     });
-
 })
 
-//cursos route
-//sends all the courses available in a JSON list
+/*
+
+ ||||||THIS ENDPOINT IS NOW WORKING AS EXPECTED||||||
+
+cursos route
+sends all the courses available in a JSON list
+*/
 app.get('/cursos', async (req, res) => {
    //should set the response as a JSON list
     await models.Course.findAll()
@@ -258,11 +269,13 @@ app.get('/reviews/:courseid', async(req, res) => {
             }).then((userVote) => {
                     currentVote = userVote ? userVote.vote : 0;
             }).catch(err => console.log(err));
+
             
-            return {...review.dataValues, 
+            
+            return {...review.dataValues,
                     vote: currentVote, 
                     author: review.dataValues.anonymous ?  'Anónimo' : review.dataValues.author} //returns current review item spreaded along the vote gotten by above function
-        }))
+        }));
 
         console.log('REVIEWS', reviews)
         res.status(200).send(reviews);
@@ -284,9 +297,8 @@ app.get('/reviews/:courseid', async(req, res) => {
  + (DONE) Should not post the review if the user has already posted one
 */
 app.post('/publicarreview', checkAuth, async (req, res) => {
-    console.log(req.user.name);
     let userPk = req.user.id;
-    let reviewId = null;
+    let createdReview = null;
     if(await models.Course.findByPk(req.body.courseid)) {  //searches if the course does exist
         if (await models.Review.findOne({ //find one row where the user id is the same as the req.user.id
             where: {userid: userPk, courseid: req.body.courseid}
@@ -295,9 +307,10 @@ app.post('/publicarreview', checkAuth, async (req, res) => {
         }         
         
         else {
-            reviewId = await postReview({...req.body, userid: userPk, author: 'Anónimo', votes: 0} ); 
-            console.log(reviewId);
-            res.status(200).send(reviewId);   
+            createdReview = await postReview({...req.body, userid: userPk, author: req.user.name, votes: 0} ); 
+            console.log(createdReview);
+            //Line from below needs to be refact
+            res.status(200).send(createdReview);    
         }
     }
 
@@ -320,15 +333,19 @@ app.delete('/eliminarreview/:id', checkAuth, async(req,res) => {
     console.log("USERID: ", userId);
 
     //First it has to check if the review was created by the user
-    models.Review.findOne({where: {userid: userId, id: reviewId}})
+    models.Review.findOne({where: {[Op.or]: [{userid: userId}, req.user.admin], id: reviewId}})
     .then( (foundReview) => { 
 
-        if(foundReview || req.user.admin){ //if it finds a review created by the user or the user is an administrator, it will execute the delete operation
-            deleteReview(reviewId)
+        if(foundReview  ){ //if it finds a review created by the user or the user is an administrator, it will execute the delete operation
+            deleteReview(foundReview.dataValues)
             .then( (rowsDeleted) => {
-                rowsDeleted > 0 ? 
-                res.status(200).send('Se eliminó la review de la base de datos') 
-                : res.status(406).send('La review que intentas eliminar ya no existe')
+                if(rowsDeleted > 0){
+                    res.status(200).send('Se eliminó la review de la base de datos');
+                    models.Review.update({},{where: {id: reviewId}})
+                }
+                else{
+                    res.status(406).send('La review que intentas eliminar ya no existe');
+                }
             });
         }
 
@@ -340,8 +357,48 @@ app.delete('/eliminarreview/:id', checkAuth, async(req,res) => {
 });
 
 /* votarreview route
-    it checks if the user has already voted 
+    req.body {
+        vote: 1 || -1,
+        reviewid: integer
+    }
 */
+app.post('/votarreview', checkAuth, async(req, res) => {
+    const reviewId = req.body.reviewid;
+    const userId = req.user.id;
+    const currentVote = parseInt(req.body.vote);
+    // We check if the vote is valid
+
+    if(currentVote !== 1 && currentVote !== -1){
+        return res.status(400).send('Voto inválido');
+    }
+
+    // We check if the user has voted this specific review
+    await models.Vote.findOne({where: {reviewid: reviewId, userid: userId}})
+    .then(async (vote) => {
+        if(vote){
+            if(vote.vote === currentVote){ //if it votes the same score as the last time it reverts the vote to 0 (nonexistent)
+                await vote.destroy()
+                await models.Review.update({votes: sequelize.literal(`votes + ${-currentVote}`)},{where: {id: reviewId}});
+
+            }
+            else{
+                vote.vote = currentVote;
+                await vote.save();
+                await models.Review.update({votes: sequelize.literal(`votes + ${2 * currentVote}`)},{where: {id: reviewId}});
+            }
+        }
+        else{
+            await models.Vote.create({
+                reviewid: reviewId,
+                userid: userId,
+                vote: currentVote
+            });
+            await models.Review.update({votes: sequelize.literal(`votes + ${currentVote}`)},{where: {id: reviewId}});     
+        }
+    }).catch((err) => console.error(err));
+    res.status(400).send('Voto actualizado');
+});
+
 
 /*     Auth routes
 These routes are used to authenticate the user and let him use protected routes
