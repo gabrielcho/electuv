@@ -196,6 +196,14 @@ app.get('/auth/google/callback/', passport.authenticate('google', { failureRedir
     res.redirect('/');
 });
 
+
+// Logout route, logs out the user.
+app.get('/logout', function(req, res){
+    req.logout();
+    res.redirect('/');
+  });
+
+
 //root route ('homepage')
 app.get('/', (req, res) => res.send(req.session));
 
@@ -400,12 +408,6 @@ app.post('/votarreview', checkAuth, async(req, res) => {
 });
 
 
-/*     Auth routes
-These routes are used to authenticate the user and let him use protected routes
-*/ 
-// app.get('/auth/google'); (DONE)
-// app.get('/logout');
-// app.get('/auth/google/callback'); (DONE)
 
 
 
