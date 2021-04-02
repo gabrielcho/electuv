@@ -17,7 +17,6 @@ module.exports = (sequelize, DataTypes) => {
     coursecode: DataTypes.STRING,
     coursename: DataTypes.STRING,
     description: DataTypes.TEXT,
-    rating: DataTypes.FLOAT,
     totalrating: DataTypes.INTEGER,
     reviewcount: DataTypes.INTEGER,
     faculty: DataTypes.STRING

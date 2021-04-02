@@ -18,7 +18,7 @@ module.exports = {
         type: Sequelize.TEXT
       },
       rating: {
-        type: Sequelize.INTEGER
+        type: Sequelize.FLOAT
       },
       faculty: {
         type: Sequelize.STRING
@@ -34,6 +34,6 @@ module.exports = {
     });
   },
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.dropTable('Courses');
+    await queryInterface.dropTable('courses');
   }
 };

@@ -130,8 +130,10 @@ async function postReview(jsonreview){
         console.log(reviewcount);
     }).catch(() => {return -1}); //The number of reviews
     try{
-        await models.Course.update({rating:  sequelize.literal(`${(totalRating + jsonreview.rating)/(reviewCount + 1)}`),
-            totalrating: sequelize.literal(`totalrating + ${jsonreview.rating}`), reviewcount: sequelize.literal('(reviewcount + 1)') }, {where: {id: jsonreview.courseid}});
+        await models.Course.update({
+        totalrating: sequelize.literal(`totalrating + ${jsonreview.rating}`),
+        reviewcount: sequelize.literal('(reviewcount + 1)') }, {where: {id: jsonreview.courseid}}
+        );
     }
     catch{
         return -1;
@@ -139,10 +141,13 @@ async function postReview(jsonreview){
     
     return {...createdReview, author: jsonreview.anonymous ? 'Anónimo' : jsonreview.author};
 }
- 
+
 
 // .destroy to delete rows
 /*
+        await models.Course.update({rating:  sequelize.literal(`${(totalRating + jsonreview.rating)/(reviewCount + 1)}`),
+            totalrating: sequelize.literal(`totalrating + ${jsonreview.rating}`), reviewcount: sequelize.literal('(reviewcount + 1)') }, {where: {id: jsonreview.courseid}});
+
     When we delete a review we must rollback the effects associated with course rating and review count on the respective course row
 */
 async function deleteReview(review) {
@@ -153,8 +158,9 @@ async function deleteReview(review) {
     .catch((err) => console.error(err));
         let course = await models.Course.findOne({where: {id: review.courseid}});
 
-        await models.Course.update({rating:  sequelize.literal(`(totalrating - ${review.rating}) * ${course.reviewcount - 1 === 0 ? 0 : 1/(course.reviewcount - 1 )}`),
-        totalrating: sequelize.literal(`totalrating - ${review.rating}`), reviewcount: sequelize.literal('(reviewcount - 1)') }, {where: {id: review.courseid}}).then((a) =>{a}).catch((err) => {console.error(err)});
+        await models.Course.update({
+            totalrating: sequelize.literal(`totalrating - ${review.rating}`), 
+            reviewcount: sequelize.literal('(reviewcount - 1)') }, {where: {id: review.courseid}}).then((a) =>{a}).catch((err) => {console.error(err)});
     
     return rowsdeleted;
 }
@@ -244,7 +250,13 @@ sends all the courses available in a JSON list
 app.get('/cursos', async (req, res) => {
    //should set the response as a JSON list
     await models.Course.findAll()
-        .then((courses) => res.status(200).send(courses))
+        .then((courses) => {
+            courses = courses.map((currentCourse) => {
+                return {...currentCourse.dataValues, rating: currentCourse.totalrating/(currentCourse.reviewcount === 0 ? 1 : currentCourse.reviewcount)}
+            });
+            console.log(courses);
+            res.status(200).send(courses);
+        })
         .catch((err) => res.status(400).send('error de comunicación con la base de datos'));
 });
 
