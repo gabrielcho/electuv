@@ -271,7 +271,9 @@ Reviews route.
 + (DONE) Should inform by response if there is no course with the corresponding courseid
 */
 app.get('/reviews/:courseid', async(req, res) => {
-    let userId = req.user.id;
+    
+
+
     let courseId = req.params.courseid; //route params course id
     let reviews = null;
 
@@ -281,21 +283,25 @@ app.get('/reviews/:courseid', async(req, res) => {
         .then((reviewList) => reviews = reviewList)
         .catch((err) => console.log(err));
 
-        reviews = await  Promise.all(reviews.map( (review) => { //we check for user votes for every Review
-            //if we find a vote that has the user ID and the current review ID we will place its value
-            let currentVote = 0
-            models.Vote.findOne({ //Here we have to fetch the database to know if the user has voted on any of the reviews
-                where: {userid: userId, reviewid: review.id}
-            }).then((userVote) => {
-                    currentVote = userVote ? userVote.vote : 0;
-            }).catch(err => console.log(err));
 
-            
-            
-            return {...review.dataValues,
-                    vote: currentVote, 
-                    author: review.dataValues.anonymous ?  'Anónimo' : review.dataValues.author} //returns current review item spreaded along the vote gotten by above function
-        }));
+        if ('user' in req) { // Checks if there's an already authenticated user in order to look for the already voted reviews
+            reviews = await  Promise.all(reviews.map( (review) => { //we check for user votes for every Review
+                //if we find a vote that has the user ID and the current review ID we will place its value
+                let currentVote = 0
+                models.Vote.findOne({ //Here we have to fetch the database to know if the user has voted on any of the reviews
+                    where: {userid: req.user.id, reviewid: review.id}
+                }).then((userVote) => {
+                        currentVote = userVote ? userVote.vote : 0;
+                }).catch(err => console.log(err));
+    
+                
+                
+                return {...review.dataValues,
+                        vote: currentVote, 
+                        author: review.dataValues.anonymous ?  'Anónimo' : review.dataValues.author} //returns current review item spreaded along the vote gotten by above function
+            }));
+        }
+
 
         console.log('REVIEWS', reviews)
         res.status(200).send(reviews);
